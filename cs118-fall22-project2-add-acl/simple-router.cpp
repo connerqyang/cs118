@@ -24,7 +24,8 @@ namespace simple_router {
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 // IMPLEMENT THIS METHOD
-static const string broadcast_address = "FF:FF:FF:FF:FF:FF";
+static const std::string broadcast_address = "FF:FF:FF:FF:FF:FF";
+static const std::string lowercase_broadcast_address = "ff:ff:ff:ff:ff:ff";
 void
 SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 {
@@ -40,6 +41,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
   std::cerr << getRoutingTable() << std::endl;
 
   // FILL THIS IN
+
   // Initialize packet type, source/destianation addresses from iface and packet
   std::string iface_addr = macToString(iface->addr);
   std::string packet_addr = macToString(packet);
@@ -52,19 +54,28 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
   }
 
   // Ignore Ethernet frames not destined to router (not corresponding MAC address or broadcast address)
-  if (packet_addr != broadcast_address && packet_addr != iface_addr) {
+  if (packet_addr != lowercase_broadcast_address && packet_addr != broadcast_address && packet_addr != iface_addr) {
     std::cerr << "Received packet, but destination is not the router, ignoring" << std::endl;
     return;
   }
 
   // Dispatch Ethernet frames (payload) carrying ARP and IPv4 packets
   if (ether_type == ethertype_arp) {  // ARP packets
+    std::cerr << "Processing ARP packet" << std::endl;
     const arp_hdr* arp_header = reinterpret_cast<const arp_hdr*>(packet.data() + sizeof(ethernet_hdr));
     uint32_t target_ip = arp_header->arp_tip;
     uint16_t op_code = ntohs(arp_header->arp_op);
 
+    // Check that packet is the correct size for a valid ARP message
+    if (packet.size() < sizeof(ethernet_hdr) + sizeof(arp_hdr))
+    {
+      std::cerr << "Packet size is not larget enough for ARP, ignoring" << std::endl;
+      return;
+    }
+
     // Determine request or reply based on op code
     if (op_code == arp_op_request) {        // Handle ARP request
+      std::cerr << "Processing ARP Request" << std::endl;
       // Ignore if request is not for MAC address for IP address of interface
       if (target_ip != iface->ip) {
         std::cerr << "Destination IP address doesn't match the interface's IP address, ignoring" << std::endl;
@@ -72,28 +83,181 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       }
 
       // Check if ARP cache contains corresponding MAC address
+
       // If valid entry found, proceed to handle IP packet
       // Otherwise, queue received packet and start sending ARP requests to discover IP-MAC mapping
         // Send once a second until ARP reply received, or request has been sent 5 times
         // If no ARP reply received, stop re-transmitting, remove pending request and any queued packets
 
+      // Init variables for ARP response
+      ethernet_hdr resp_eth_hdr;
+      arp_hdr resp_arp_hdr;
+      Buffer resp_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
+
+      // Construct response ethernet header
+      memcpy(resp_eth_hdr.ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
+      memcpy(resp_eth_hdr.ether_dhost, &(arp_header->arp_sha), ETHER_ADDR_LEN);
+      resp_eth_hdr.ether_type = htons(ethertype_arp);
+
+      // Construct response arp header
+      resp_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
+      resp_arp_hdr.arp_pro = htons(ethertype_ip);
+      resp_arp_hdr.arp_hln = ETHER_ADDR_LEN;
+      resp_arp_hdr.arp_pln = 4;
+      resp_arp_hdr.arp_op = htons(arp_op_reply);
+
+      // Configure sources and targets
+      resp_arp_hdr.arp_sip = iface->ip;
+      resp_arp_hdr.arp_tip = arp_header->arp_sip;
+      memcpy(resp_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
+      memcpy(resp_arp_hdr.arp_tha, &(arp_header->arp_sha), ETHER_ADDR_LEN);
+      
+      // Populate buffer with constructed headers
+      memcpy(resp_packet.data(), &resp_eth_hdr, sizeof(ethernet_hdr));
+      memcpy(resp_packet.data() + sizeof(ethernet_hdr), &resp_arp_hdr, sizeof(arp_hdr));
+
+      // Send back the response/reply
+      sendPacket(packet_buff, iface->name);
+
     } else if (op_code == arp_op_reply) {   // Handle ARP reply
+      std::cerr << "Processing ARP Reply" << std::endl;
+
+      // Retrieve IP<->MAC mapping from ARP response
+      Buffer addr_mapping(ETHER_ADDR_LEN);
+      memcpy(addr_mapping.data(), arp_header->arp_sha, ETHER_ADDR_LEN);
+
       // Record IP-MAC mapping in ARP cache (Source IP/Souce hardware address in ARP reply)
+      if(m_arp.lookup(arp_header->arp_sip) == nullptr) {
+        std::shared_ptr<ArpRequest> arp_request = m_arp.insertArpEntry(addr_mapping, arp_header->arp_sip);
+        // Remove the pending request
+        m_arp.removeRequest(arp_request);
+        // Then, send out all corresponding enqueued packets
+        if (arp_request != NULL)
+        {
+          for (std::list<PendingPacket>::iterator iter = arp_req->packets.begin(); iter != arp_req->packets.end(); iter++)
+          {
+            ethernet_hdr* eth_hdr = (ethernet_hdr*) iter->packet.data();
 
-      // Then, send out all corresponding enqueued packets
+            memcpy(eth_hdr->ether_dhost, arp_header->arp_sha, ETHER_ADDR_LEN);
+            memcpy(eth_hdr->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
 
-    } else {  // Op code not recognized
+            sendPacket(iter->packet, iter->iface);
+          }
+        }
+      } else {
+        std::cerr << "ARP reply/response received is invalid, ignoring" << std::endl;
+        return;
+      }
+    } else {  // OP code not recognized
       std::cerr << "ARP op code not recognized, ignoring" << std::endl;
       return;
     }
-    
-
-    
-
   } else if (ether_type == ethertype_ip) {  // IP packets
+    std::cerr << "Processing IP packet" << std::endl;
 
+    // Initialize variables to hold packet and header
+    Buffer ip_packet(packet);
+    ip_hdr* ip_header = ip_packet.data() + sizeof(ethernet_hdr);
+
+    // Check that packet is the above the minimum size for a valid IP message
+    if (packet.size() < sizeof(ethernet_hdr) + sizeof(ip_hdr))
+    {
+      std::cerr << "Packet size is not larget enough for IP, ignoring" << std::endl;
+      return;
+    }
+
+    // Check that the ip header is above the minimum size for a valid message
+    if (ip_header->ip_len < sizeof(ip_hdr))
+    {
+      std::cerr << "Invalid packet size, too small for IPv4 header, ignoring" << std::endl;
+    }
+
+    // Verify checksum
+    uint16_t checksum = ip_header->ip_sum;
+    ip_header->ip_sum = 0;
+    if(checksum != cksum(ip_header, sizeof(ip_hdr))) {
+      std::cerr << "IP packet has incorrect checksum" << std::endl;
+      return;
+    }
+
+    // Classify datagrams into (1) destined to the router or (2) datagrams to be forwarded
+    const Interface* iface = findIfaceByIp(ip_header->ip_dst);
+    if (iface != nullptr) {
+      // (1) discard packets
+      std::cerr << "Packet discarded, since incoming IP packet's destination is the router" << std::endl;
+      return
+    } else {
+      // (2) Use longest prefix match alg. to find next-hop IP addr in routing table and attempt to forward it there
+      //      For each forwarded packet:
+      //          decrement TTL and recompute checksum
+      std::cerr << "Routing packets" << std::endl;
+      if (ip_header->ip_ttl == 0) {
+        std::cerr << "The TTL is 0, dropping this packet" << std::endl;
+        return;
+      }
+      ip_header->ip_ttl--;  // Decrement TTL
+      ip_header->ip_sum = cksum(ip_header, sizeof(ip_hdr));   // Recompute checksum
+
+      // Check routing table for longest prefix match with dest. IP address
+      RoutingTableEntry next_hop = m_routingTable.lookup(ip_header->ip_dst);
+      const Interface* ip_iface = findIfaceByName(next_hop.ifName);
+
+      // Check ARP cache for next-hop MAC address corresponding to next-hop IP
+      std::shared_ptr<ArpEntry> arp = m_arp.lookup(ip_header->ip_dst);
+
+      // If it's there, send it.
+      if (arp != nullptr) {
+        // Construct Ethernet header
+        ethernet_hdr* eth_hdr = (ethernet_hdr*) ip_packet.data();
+
+        eth_hdr->ether_type = htons(ethertype_ip);
+        memcpy(eth_hdr->ether_shost, eth_hdr->ether_dhost, ETHER_ADDR_LEN);   // Old destination is new source
+        memcpy(eth_hdr->ether_dhost, arp->mac.data(), ETHER_ADDR_LEN);
+
+        // Send it!
+        sendPacket(ip_packet, ip_iface->name);
+        std::cerr << "Forwarded IP packet!" << std::endl;
+      } else {
+        // Otherwise:
+        //    Send an ARP request for the next-hop IP (if one hasn't been sent within the last second)
+
+        // Init variables for ARP request
+        ethernet_hdr req_eth_hdr;
+        arp_hdr req_arp_hdr;
+        Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
+
+        // Construct response ethernet header
+        resp_eth_hdr.ether_type = htons(ethertype_arp);
+        memcpy(req_eth_hdr.ether_shost, ip_iface->addr.data(), ETHER_ADDR_LEN);
+        memcpy(req_eth_hdr.ether_dhost, &(arp_header->arp_sha), ETHER_ADDR_LEN);
+
+        // Construct response arp header
+        req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
+        req_arp_hdr.arp_pro = htons(ethertype_ip);
+        req_arp_hdr.arp_hln = ETHER_ADDR_LEN;
+        req_arp_hdr.arp_pln = 4;
+        req_arp_hdr.arp_op = htons(arp_op_request);
+
+        // Configure sources and targets
+        resp_arp_hdr.arp_sip = ip_iface->ip;
+        // resp_arp_hdr.arp_tip = arp_header->arp_sip;
+        resp_arp_hdr.arp_tip = next_hop.gw;
+        memcpy(resp_arp_hdr.arp_sha, ip_iface->addr.data(), ETHER_ADDR_LEN);
+        memcpy(resp_arp_hdr.arp_tha, broadcast_address, ETHER_ADDR_LEN);
+        
+        // Populate buffer with constructed headers
+        memcpy(resp_packet.data(), &resp_eth_hdr, sizeof(ethernet_hdr));
+        memcpy(resp_packet.data() + sizeof(ethernet_hdr), &resp_arp_hdr, sizeof(arp_hdr));
+
+        // Send back the response/reply
+        sendPacket(packet_buff, ip_iface->name);
+
+        // Add the packet to the queue of packets waiting on this ARIP request
+        m_arp.queueArpRequest(next_hop.gw, ip_packet, iface->name);
+        std::cerr << "ARP Request queued!" << std::endl;
+      }
+    }
   }
-
 }
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
