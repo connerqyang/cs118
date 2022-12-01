@@ -117,7 +117,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       memcpy(resp_packet.data() + sizeof(ethernet_hdr), &resp_arp_hdr, sizeof(arp_hdr));
 
       // Send back the response/reply
-      sendPacket(packet_buff, iface->name);
+      sendPacket(resp_packet, iface->name);
 
     } else if (op_code == arp_op_reply) {   // Handle ARP reply
       std::cerr << "Processing ARP Reply" << std::endl;
@@ -130,11 +130,11 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       if(m_arp.lookup(arp_header->arp_sip) == nullptr) {
         std::shared_ptr<ArpRequest> arp_request = m_arp.insertArpEntry(addr_mapping, arp_header->arp_sip);
         // Remove the pending request
-        m_arp.removeRequest(arp_request);
+        m_arp.removeArpRequest(arp_request);
         // Then, send out all corresponding enqueued packets
         if (arp_request != NULL)
         {
-          for (std::list<PendingPacket>::iterator iter = arp_req->packets.begin(); iter != arp_req->packets.end(); iter++)
+          for (std::list<PendingPacket>::iterator iter = arp_request->packets.begin(); iter != arp_request->packets.end(); iter++)
           {
             ethernet_hdr* eth_hdr = (ethernet_hdr*) iter->packet.data();
 
@@ -157,7 +157,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
     // Initialize variables to hold packet and header
     Buffer ip_packet(packet);
-    ip_hdr* ip_header = ip_packet.data() + sizeof(ethernet_hdr);
+    ip_hdr* ip_header = (ip_hdr*) (ip_packet.data() + sizeof(ethernet_hdr));
 
     // Check that packet is the above the minimum size for a valid IP message
     if (packet.size() < sizeof(ethernet_hdr) + sizeof(ip_hdr))
@@ -185,7 +185,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     if (iface != nullptr) {
       // (1) discard packets
       std::cerr << "Packet discarded, since incoming IP packet's destination is the router" << std::endl;
-      return
+      return;
     } else {
       // (2) Use longest prefix match alg. to find next-hop IP addr in routing table and attempt to forward it there
       //      For each forwarded packet:
@@ -227,7 +227,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
 
         // Construct response ethernet header
-        resp_eth_hdr.ether_type = htons(ethertype_arp);
+        req_eth_hdr.ether_type = htons(ethertype_arp);
         memcpy(req_eth_hdr.ether_shost, ip_iface->addr.data(), ETHER_ADDR_LEN);
         memcpy(req_eth_hdr.ether_dhost, &(arp_header->arp_sha), ETHER_ADDR_LEN);
 
@@ -239,15 +239,15 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         req_arp_hdr.arp_op = htons(arp_op_request);
 
         // Configure sources and targets
-        resp_arp_hdr.arp_sip = ip_iface->ip;
-        // resp_arp_hdr.arp_tip = arp_header->arp_sip;
-        resp_arp_hdr.arp_tip = next_hop.gw;
-        memcpy(resp_arp_hdr.arp_sha, ip_iface->addr.data(), ETHER_ADDR_LEN);
-        memcpy(resp_arp_hdr.arp_tha, broadcast_address, ETHER_ADDR_LEN);
+        req_arp_hdr.arp_sip = ip_iface->ip;
+        // req_arp_hdr.arp_tip = arp_header->arp_sip;
+        req_arp_hdr.arp_tip = next_hop.gw;
+        memcpy(req_arp_hdr.arp_sha, ip_iface->addr.data(), ETHER_ADDR_LEN);
+        memcpy(req_arp_hdr.arp_tha, broadcast_address, ETHER_ADDR_LEN);
         
         // Populate buffer with constructed headers
-        memcpy(resp_packet.data(), &resp_eth_hdr, sizeof(ethernet_hdr));
-        memcpy(resp_packet.data() + sizeof(ethernet_hdr), &resp_arp_hdr, sizeof(arp_hdr));
+        memcpy(req_packet.data(), &req_eth_hdr, sizeof(ethernet_hdr));
+        memcpy(req_packet.data() + sizeof(ethernet_hdr), &req_arp_hdr, sizeof(arp_hdr));
 
         // Send back the response/reply
         sendPacket(packet_buff, ip_iface->name);
