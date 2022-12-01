@@ -24,10 +24,12 @@ namespace simple_router {
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 // IMPLEMENT THIS METHOD
+static const string broadcast_address = "FF:FF:FF:FF:FF:FF";
 void
 SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 {
   std::cerr << "Got packet of size " << packet.size() << " on interface " << inIface << std::endl;
+  print_hdrs(packet);
 
   const Interface* iface = findIfaceByName(inIface);
   if (iface == nullptr) {
@@ -38,6 +40,59 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
   std::cerr << getRoutingTable() << std::endl;
 
   // FILL THIS IN
+  // Initialize packet type, source/destianation addresses from iface and packet
+  std::string iface_addr = macToString(iface->addr);
+  std::string packet_addr = macToString(packet);
+  uint16_t ether_type = ethertype(packet.data());
+
+  // Ignore Ethernet frames other than ARP and IPv4
+  if (ether_type != ethertype_arp && ether_type != ethertype_ip) {
+    std::cerr << "Received packet, but Ethernet frame is not ARP or IPv4, ignoring" << std::endl;
+    return;
+  }
+
+  // Ignore Ethernet frames not destined to router (not corresponding MAC address or broadcast address)
+  if (packet_addr != broadcast_address && packet_addr != iface_addr) {
+    std::cerr << "Received packet, but destination is not the router, ignoring" << std::endl;
+    return;
+  }
+
+  // Dispatch Ethernet frames (payload) carrying ARP and IPv4 packets
+  if (ether_type == ethertype_arp) {  // ARP packets
+    const arp_hdr* arp_header = reinterpret_cast<const arp_hdr*>(packet.data() + sizeof(ethernet_hdr));
+    uint32_t target_ip = arp_header->arp_tip;
+    uint16_t op_code = ntohs(arp_header->arp_op);
+
+    // Determine request or reply based on op code
+    if (op_code == arp_op_request) {        // Handle ARP request
+      // Ignore if request is not for MAC address for IP address of interface
+      if (target_ip != iface->ip) {
+        std::cerr << "Destination IP address doesn't match the interface's IP address, ignoring" << std::endl;
+        return;
+      }
+
+      // Check if ARP cache contains corresponding MAC address
+      // If valid entry found, proceed to handle IP packet
+      // Otherwise, queue received packet and start sending ARP requests to discover IP-MAC mapping
+        // Send once a second until ARP reply received, or request has been sent 5 times
+        // If no ARP reply received, stop re-transmitting, remove pending request and any queued packets
+
+    } else if (op_code == arp_op_reply) {   // Handle ARP reply
+      // Record IP-MAC mapping in ARP cache (Source IP/Souce hardware address in ARP reply)
+
+      // Then, send out all corresponding enqueued packets
+
+    } else {  // Op code not recognized
+      std::cerr << "ARP op code not recognized, ignoring" << std::endl;
+      return;
+    }
+    
+
+    
+
+  } else if (ether_type == ethertype_ip) {  // IP packets
+
+  }
 
 }
 //////////////////////////////////////////////////////////////////////////
