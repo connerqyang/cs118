@@ -226,12 +226,12 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         arp_hdr req_arp_hdr;
         Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
 
-        // Construct response ethernet header
+        // Construct request ethernet header
         req_eth_hdr.ether_type = htons(ethertype_arp);
         memcpy(req_eth_hdr.ether_shost, ip_iface->addr.data(), ETHER_ADDR_LEN);
-        memcpy(req_eth_hdr.ether_dhost, &(arp_header->arp_sha), ETHER_ADDR_LEN);
+        memcpy(req_eth_hdr.ether_dhost, broadcast_address, ETHER_ADDR_LEN);
 
-        // Construct response arp header
+        // Construct request arp header
         req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
         req_arp_hdr.arp_pro = htons(ethertype_ip);
         req_arp_hdr.arp_hln = ETHER_ADDR_LEN;
