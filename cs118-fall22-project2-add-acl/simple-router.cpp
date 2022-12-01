@@ -26,6 +26,7 @@ namespace simple_router {
 // IMPLEMENT THIS METHOD
 static const std::string broadcast_address = "FF:FF:FF:FF:FF:FF";
 static const std::string lowercase_broadcast_address = "ff:ff:ff:ff:ff:ff";
+static const uint8_t broadcast[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 void
 SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 {
@@ -228,9 +229,8 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
         // Construct request ethernet header
         req_eth_hdr.ether_type = htons(ethertype_arp);
-
         memcpy(req_eth_hdr.ether_shost, ip_iface->addr.data(), ETHER_ADDR_LEN);
-        memcpy(req_eth_hdr.ether_dhost, INADDR_BROADCAST, ETHER_ADDR_LEN);
+        memcpy(req_eth_hdr.ether_dhost, broadcast, ETHER_ADDR_LEN);
 
         // Construct request arp header
         req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
@@ -244,7 +244,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         // req_arp_hdr.arp_tip = arp_header->arp_sip;
         req_arp_hdr.arp_tip = next_hop.gw;
         memcpy(req_arp_hdr.arp_sha, ip_iface->addr.data(), ETHER_ADDR_LEN);
-        memcpy(req_arp_hdr.arp_tha, , ETHER_ADDR_LEN);
+        memcpy(req_arp_hdr.arp_tha, broadcast, ETHER_ADDR_LEN);
         
         // Populate buffer with constructed headers
         memcpy(req_packet.data(), &req_eth_hdr, sizeof(ethernet_hdr));
