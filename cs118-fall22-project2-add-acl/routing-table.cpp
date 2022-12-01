@@ -31,10 +31,31 @@ namespace simple_router {
 RoutingTableEntry
 RoutingTable::lookup(uint32_t ip) const
 {
-
   // FILL THIS IN
+  // Use longest prefix match algorithm to determine next-hop IP address in routing table, and return it
+  RoutingTableEntry* longest_prefix_match = nullptr;
+  int match = -1;              // Sentinel for no match
 
-  throw std::runtime_error("Routing entry not found");
+  // Start at start of routing table in list form
+  for (std::list<RoutingTableEntry>::const_iterator rt = m_entries.begin(); rt != m_entries.end(); rt++) {
+    // If we match prefix...
+    if ((ip & rt->mask) == (rt->dest & rt->mask)) {
+      int mask = (int) rt->mask;
+      if (mask > match) {   // If we found a longer match...
+        match = mask;        // Remember best match length so far
+        // gateway = rt->gw;        // Remember next hop
+        // interface = rt->ifName;  // Remember interface to forward to
+        longest_prefix_match = (RoutingTableEntry*) rt;
+      }
+    }
+  }
+
+  // Throw error if no match found
+  if (match == -1 || longest_prefix_match == nullptr || longest_prefix_match == NULL) {
+    throw std::runtime_error("Routing entry not found");
+  }
+  
+  return *longest_prefix_match;
 }
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////

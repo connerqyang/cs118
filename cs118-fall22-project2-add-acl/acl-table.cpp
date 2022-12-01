@@ -58,14 +58,33 @@ ACLTableEntry
 ACLTable::lookup(uint32_t srcIp, uint32_t dstIp, uint8_t protocol, uint32_t srcPort, uint16_t dstPort) const
 {
   // FILL THIS IN
+  ACLTableEntry* return_rule = nullptr;
+  int highest_priority = -1;
+  // Loop through rules, apply them if needed
+  for (std::list<ACLTableEntry>::const_iterator rule = m_entries.begin(); rule != m_entries.end(); rule++) {
+    // If fields do NOT match, then this rule does not apply so skip it
+    if (rule->src != srcIp || rule->dest != dstIp || rule->protocol != protocol || rule->srcPort != srcPort || rule->destPort != dstPort) {
+      continue;
+    }
 
-  throw std::runtime_error("ACL entry not found");
+    // Otherwise, update highest priority
+    if (rule->priority > highest_priority) {
+      highest_priority = rule->priority;
+      return_rule = (ACLTableEntry*) rule;
+    }
+  }
+
+  if (highest_priority == -1) {
+    return NULL;
+  }
+  return *highest_priority;
 }
 
 void
 ACLTable::addRule(ACLTableEntry& entry)
 {
   // FILL THIS IN
+  m_entries.push_back(entry);
 }
 
 //////////////////////////////////////////////////////////////////////////

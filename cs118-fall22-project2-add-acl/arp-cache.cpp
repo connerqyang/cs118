@@ -30,9 +30,74 @@ namespace simple_router {
 void
 ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
-
   // FILL THIS IN
+  // If there is an ongoing traffic
+  std::list<std::shared_ptr<ArpRequest>>::iterator req = m_arpRequests.begin();
+  while (req != m_arpRequests.end()) {
+    // If no ARP reply received and request transmitted >=5 times,
+    if ((*req)->nTimesSent >= MAX_SENT_TIME) {
+      // Remove packets queued for transmission associated with the request
+      std::list<PendingPacket>::const_iterator packet = (*req)->packets.begin();
+      while (packet != (*req)->packets.end()) {
+        packet = (*req)->packets.erase(packet);
+      }
 
+      // Remove pending request
+      m_arpRequests.erase(req);
+    } else {    // Send ARP request once per second until ARP reply is received or request has been sent out >=5 times
+      // Find interface
+      const Interface* iface = m_router.findIfaceByName((*req)->packets.front().iface);
+
+      // Init variables for ARP request
+      ethernet_hdr req_eth_hdr;
+      arp_hdr req_arp_hdr;
+      Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
+
+      // Construct request ethernet header
+      req_eth_hdr.ether_type = htons(ethertype_arp);
+      memcpy(req_eth_hdr.ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
+      memcpy(req_eth_hdr.ether_dhost, 0xFF, ETHER_ADDR_LEN);
+      
+      // Construct request arp header
+      req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
+      req_arp_hdr.arp_pro = htons(ethertype_ip);
+      req_arp_hdr.arp_hln = ETHER_ADDR_LEN;
+      req_arp_hdr.arp_pln = 4;
+      req_arp_hdr.arp_op = htons(arp_op_request);
+
+      // Configure sources and targets
+      req_arp_hdr.arp_sip = iface->ip;
+      req_arp_hdr.arp_tip = (*req)->ip;
+      memcpy(req_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
+      memcpy(req_arp_hdr.arp_tha, 0xFF, ETHER_ADDR_LEN);    // TODO
+      
+      // Populate buffer with constructed headers
+      memcpy(req_packet.data(), &req_eth_hdr, sizeof(ethernet_hdr));
+      memcpy(req_packet.data() + sizeof(ethernet_hdr), &req_arp_hdr, sizeof(arp_hdr));
+
+      // Send the request
+      sendPacket(req_packet, iface->name);
+
+      // Update timers
+      (*req)->timeSent = steady_clock.now();
+      (*req)->nTimesSent++;
+
+      // Cache response (done in simple-router.cpp)
+    }
+
+    req++;    // Move to next request
+  }
+
+  // Else, ARP cache should eventually become empty
+  // Loop over all cache entries, mark invalid if it has been 30 seconds
+  std::list<std::shared_ptr<ArpEntry>>::iterator arp_cache_entry = m_cacheEntries.begin()
+  while (arp_cache_entry != m_cacheEntries.end()) {
+    if ((*arp_cache_entry)->isValid) {
+      arp_cache_entry++;    // Skip this one
+    } else {
+      m_cacheEntries.erase(arp_cache_entry);  // Else, delete it.
+    }
+  }
 }
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////

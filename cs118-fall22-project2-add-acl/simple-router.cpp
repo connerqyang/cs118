@@ -139,6 +139,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
           {
             ethernet_hdr* eth_hdr = (ethernet_hdr*) iter->packet.data();
 
+            // TODO: is the dhost right?
             memcpy(eth_hdr->ether_dhost, arp_header->arp_sha, ETHER_ADDR_LEN);
             memcpy(eth_hdr->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
 
@@ -176,10 +177,22 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     // Verify checksum
     uint16_t checksum = ip_header->ip_sum;
     ip_header->ip_sum = 0;
-    if(checksum != cksum(ip_header, sizeof(ip_hdr))) {
+    if (checksum != cksum(ip_header, sizeof(ip_hdr))) {
       std::cerr << "IP packet has incorrect checksum" << std::endl;
       return;
     }
+
+    // Prepare port # for ACL rule lookup
+    // uint32_t src_port = ;
+    // uint32_t dst_port = ;
+
+    // // Check ACL rules, take action accordingly
+    // ACLTableEntry rule = m_aclTable.lookup();
+    // if (rule != NULL) {
+    //   // Log rule
+
+    //   // Follow it: Deny -> return here, Allow -> proceed below
+    // }
 
     // Classify datagrams into (1) destined to the router or (2) datagrams to be forwarded
     const Interface* iface = findIfaceByIp(ip_header->ip_dst);
@@ -208,6 +221,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
       // If it's there, send it.
       if (arp != nullptr) {
+        std::cerr << "Forwarding IP packet!" << std::endl;
         // Construct Ethernet header
         ethernet_hdr* eth_hdr = (ethernet_hdr*) ip_packet.data();
 
@@ -217,8 +231,9 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
         // Send it!
         sendPacket(ip_packet, ip_iface->name);
-        std::cerr << "Forwarded IP packet!" << std::endl;
+        std::cerr << "Forwarded!!!" << std::endl;
       } else {
+        std::cerr << "Queuing ARP request!" << std::endl;
         // Otherwise:
         //    Send an ARP request for the next-hop IP (if one hasn't been sent within the last second)
 
