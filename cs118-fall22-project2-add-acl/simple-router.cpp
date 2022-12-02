@@ -140,8 +140,8 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
             ethernet_hdr* eth_hdr = (ethernet_hdr*) iter->packet.data();
 
             // TODO: is the dhost right?
-            memcpy(eth_hdr->ether_dhost, arp_header->arp_sha, ETHER_ADDR_LEN);
             memcpy(eth_hdr->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
+            memcpy(eth_hdr->ether_dhost, arp_header->arp_sha, ETHER_ADDR_LEN);
 
             sendPacket(iter->packet, iter->iface);
           }
@@ -234,7 +234,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       } else {
         std::cerr << "Queuing ARP request!" << std::endl;
         // Add the packet to the queue of packets waiting on this ARP request
-        m_arp.queueArpRequest(next_hop.gw, packet, iface->name);
+        m_arp.queueArpRequest(next_hop.gw, packet, ip_iface->name);
         std::cerr << "ARP Request queued!" << std::endl;
 
         // Otherwise:
