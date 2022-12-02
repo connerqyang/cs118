@@ -31,6 +31,7 @@ namespace simple_router {
 RoutingTableEntry
 RoutingTable::lookup(uint32_t ip) const
 {
+  std::cerr << "Performing lookup in RoutingTable" << std::endl;
   // FILL THIS IN
   // Use longest prefix match algorithm to determine next-hop IP address in routing table, and return it
   RoutingTableEntry* longest_prefix_match = nullptr;
@@ -53,9 +54,9 @@ RoutingTable::lookup(uint32_t ip) const
   // Throw error if no match found
   if (match == -1 || longest_prefix_match == nullptr || longest_prefix_match == NULL) {
     throw std::runtime_error("Routing entry not found");
+  } else {
+    return *longest_prefix_match;
   }
-  
-  return *longest_prefix_match;
 }
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
