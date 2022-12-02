@@ -45,7 +45,7 @@ RoutingTable::lookup(uint32_t ip) const
         match = mask;        // Remember best match length so far
         // gateway = rt->gw;        // Remember next hop
         // interface = rt->ifName;  // Remember interface to forward to
-        longest_prefix_match = (RoutingTableEntry*) rt;
+        longest_prefix_match = (RoutingTableEntry*) &*rt;
       }
     }
   }
