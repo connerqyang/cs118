@@ -30,6 +30,7 @@ namespace simple_router {
 void
 ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
+  /*
   // FILL THIS IN
   // If there is an ongoing traffic
   std::list<std::shared_ptr<ArpRequest>>::iterator req = m_arpRequests.begin();
@@ -98,6 +99,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       m_cacheEntries.erase(arp_cache_entry);  // Else, delete it.
     }
   }
+  */
 }
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
