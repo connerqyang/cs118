@@ -200,20 +200,20 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     }
 
     // Check ACL rules, take action accordingly
-    ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
-    if (rule != NULL) {
-      // Log rule
-      std::string filePath = "router-acl.log";
-      std::ofstream ofs(filePath.c_str(), std::ios_base::out | std::ios_base::app );
-      ofs << rule << '\n';
-      ofs.close();
+    // ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
+    // if (rule != NULL) {
+    //   // Log rule
+    //   std::string filePath = "router-acl.log";
+    //   std::ofstream ofs(filePath.c_str(), std::ios_base::out | std::ios_base::app );
+    //   ofs << rule << '\n';
+    //   ofs.close();
 
-      // Follow it: Deny -> return here, Allow -> proceed below
-      if (rule.action == deny) {
-        std::cerr << "IP packet denied by ACL table, logged." << std::endl;
-        return;
-      }
-    }
+    //   // Follow it: Deny -> return here, Allow -> proceed below
+    //   if (rule.action == deny) {
+    //     std::cerr << "IP packet denied by ACL table, logged." << std::endl;
+    //     return;
+    //   }
+    // }
 
     // Classify datagrams into (1) destined to the router or (2) datagrams to be forwarded
     const Interface* iface = findIfaceByIp(ip_header->ip_dst);
