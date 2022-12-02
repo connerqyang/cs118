@@ -181,17 +181,27 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       return;
     }
 
-    // Prepare port # for ACL rule lookup
-    // uint32_t src_port = ;
-    // uint32_t dst_port = ;
+    // Define TCP and UDP protocol #'s
+    #define TCP_PROTOCOL = 0x06
+    #define UDP_PROTOCOL = 0x11
+    static const int port_length = 16;
 
-    // // Check ACL rules, take action accordingly
-    // ACLTableEntry rule = m_aclTable.lookup();
-    // if (rule != NULL) {
-    //   // Log rule
+    // Prepare port # for ACL rule lookup. Default to 0 for ICMP
+    uint32_t src_port = 0;
+    uint32_t dst_port = 0;
 
-    //   // Follow it: Deny -> return here, Allow -> proceed below
-    // }
+    // Find port #'s if TCP or UDP protocol
+    if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
+
+    }
+
+    // Check ACL rules, take action accordingly
+    ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, src_port, dst_port);
+    if (rule != NULL) {
+      // Log rule
+
+      // Follow it: Deny -> return here, Allow -> proceed below
+    }
 
     // Classify datagrams into (1) destined to the router or (2) datagrams to be forwarded
     const Interface* iface = findIfaceByIp(ip_header->ip_dst);
