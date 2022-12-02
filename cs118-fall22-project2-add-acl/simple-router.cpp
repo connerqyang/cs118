@@ -158,8 +158,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     std::cerr << "Processing IP packet" << std::endl;
 
     // Initialize variables to hold packet and header
-    Buffer ip_packet(packet);
-    ip_hdr* ip_header = (ip_hdr*) (ip_packet.data() + sizeof(ethernet_hdr));
+    ip_hdr* ip_header = (ip_hdr*) (packet.data() + sizeof(ethernet_hdr));
 
     // Check that packet is the above the minimum size for a valid IP message
     if (packet.size() < sizeof(ethernet_hdr) + sizeof(ip_hdr))
@@ -217,23 +216,27 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       const Interface* ip_iface = findIfaceByName(next_hop.ifName);
 
       // Check ARP cache for next-hop MAC address corresponding to next-hop IP
-      std::shared_ptr<ArpEntry> arp = m_arp.lookup(ip_header->ip_dst);
+      auto arp = m_arp.lookup(next_hop.gw);
 
       // If it's there, send it.
       if (arp != nullptr) {
         std::cerr << "Forwarding IP packet!" << std::endl;
         // Construct Ethernet header
-        ethernet_hdr* eth_hdr = (ethernet_hdr*) ip_packet.data();
+        ethernet_hdr* eth_hdr = (ethernet_hdr*) packet.data();
 
         eth_hdr->ether_type = htons(ethertype_ip);
         memcpy(eth_hdr->ether_shost, eth_hdr->ether_dhost, ETHER_ADDR_LEN);   // Old destination is new source
         memcpy(eth_hdr->ether_dhost, arp->mac.data(), ETHER_ADDR_LEN);
 
         // Send it!
-        sendPacket(ip_packet, ip_iface->name);
+        sendPacket(packet, ip_iface->name);
         std::cerr << "Forwarded!!!" << std::endl;
       } else {
         std::cerr << "Queuing ARP request!" << std::endl;
+        // Add the packet to the queue of packets waiting on this ARP request
+        m_arp.queueArpRequest(next_hop.gw, ip_packet, iface->name);
+        std::cerr << "ARP Request queued!" << std::endl;
+
         // Otherwise:
         //    Send an ARP request for the next-hop IP (if one hasn't been sent within the last second)
 
@@ -267,10 +270,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
         // Send back the response/reply
         sendPacket(req_packet, ip_iface->name);
-
-        // Add the packet to the queue of packets waiting on this ARIP request
-        m_arp.queueArpRequest(next_hop.gw, ip_packet, iface->name);
-        std::cerr << "ARP Request queued!" << std::endl;
+        std::cerr << "Sent ARP request packet!" << std::endl;
       }
     }
   }
