@@ -56,7 +56,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       // Construct request ethernet header
       req_eth_hdr.ether_type = htons(ethertype_arp);
       memcpy(req_eth_hdr.ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
-      memcpy(req_eth_hdr.ether_dhost, 0xFF, ETHER_ADDR_LEN);
+      // memcpy(req_eth_hdr.ether_dhost, 0xFF, ETHER_ADDR_LEN);
       
       // Construct request arp header
       req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
@@ -69,17 +69,17 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       req_arp_hdr.arp_sip = iface->ip;
       req_arp_hdr.arp_tip = (*req)->ip;
       memcpy(req_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
-      memcpy(req_arp_hdr.arp_tha, 0xFF, ETHER_ADDR_LEN);    // TODO
+      // memcpy(req_arp_hdr.arp_tha, 0xFF, ETHER_ADDR_LEN);    // TODO
       
       // Populate buffer with constructed headers
       memcpy(req_packet.data(), &req_eth_hdr, sizeof(ethernet_hdr));
       memcpy(req_packet.data() + sizeof(ethernet_hdr), &req_arp_hdr, sizeof(arp_hdr));
 
       // Send the request
-      sendPacket(req_packet, iface->name);
+      m_router.sendPacket(req_packet, iface->name);
 
       // Update timers
-      (*req)->timeSent = steady_clock.now();
+      (*req)->timeSent = steady_clock::now();
       (*req)->nTimesSent++;
 
       // Cache response (done in simple-router.cpp)
@@ -90,7 +90,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
 
   // Else, ARP cache should eventually become empty
   // Loop over all cache entries, mark invalid if it has been 30 seconds
-  std::list<std::shared_ptr<ArpEntry>>::iterator arp_cache_entry = m_cacheEntries.begin()
+  std::list<std::shared_ptr<ArpEntry>>::iterator arp_cache_entry = m_cacheEntries.begin();
   while (arp_cache_entry != m_cacheEntries.end()) {
     if ((*arp_cache_entry)->isValid) {
       arp_cache_entry++;    // Skip this one
