@@ -187,20 +187,32 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     static const int port_length = 16;
 
     // Prepare port # for ACL rule lookup. Default to 0 for ICMP
-    uint32_t src_port = 0;
-    uint32_t dst_port = 0;
+    uint32_t* src_port;
+    uint32_t* dst_port;
 
     // Find port #'s if TCP or UDP protocol
     if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
-
+      memcpy(src_port, ip_header + sizeof(ip_hdr), port_length);
+      memcpy(dst_port, ip_header + sizeof(ip_hdr) + sizeof(ip_hdr), port_length);
+    } else {
+      *src_port = 0;
+      *dst_port = 0;
     }
 
     // Check ACL rules, take action accordingly
-    ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, src_port, dst_port);
+    ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
     if (rule != NULL) {
       // Log rule
+      std::string filePath = "router-acl.log";
+      std::ofstream ofs(filePath.c_str(), std::ios_base::out | std::ios_base::app );
+      ofs << rule << '\n';
+      ofs.close();
 
       // Follow it: Deny -> return here, Allow -> proceed below
+      if (rule.action == deny) {
+        std::cerr << "IP packet denied by ACL table, logged." << std::endl;
+        return;
+      }
     }
 
     // Classify datagrams into (1) destined to the router or (2) datagrams to be forwarded
