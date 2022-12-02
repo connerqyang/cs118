@@ -234,7 +234,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       } else {
         std::cerr << "Queuing ARP request!" << std::endl;
         // Add the packet to the queue of packets waiting on this ARP request
-        m_arp.queueArpRequest(next_hop.gw, ip_packet, iface->name);
+        m_arp.queueArpRequest(next_hop.gw, packet, iface->name);
         std::cerr << "ARP Request queued!" << std::endl;
 
         // Otherwise:
