@@ -200,7 +200,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     bool acl_rule_found = true;
     ACLTableEntry rule;
     try {
-      rule = m_aclTable.lookup(ntohs(ip_header->ip_src), ntohs(ip_header->ip_dst), ntohs(ip_header->ip_p), ntohs(src_port), ntohs(dst_port));
+      rule = m_aclTable.lookup(ntohl(ip_header->ip_src), ntohl(ip_header->ip_dst), ntohs(ip_header->ip_p), ntohs(src_port), ntohs(dst_port));
     } catch (std::runtime_error& e) {
       std::cerr << "No matching ACL rule found, proceed with IP packet." << std::endl;
       acl_rule_found = false;
