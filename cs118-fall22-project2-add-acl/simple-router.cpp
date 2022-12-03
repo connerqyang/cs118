@@ -134,7 +134,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         // Then, send out all corresponding enqueued packets
         if (arp_request != NULL) {
           for (std::list<PendingPacket>::iterator pending_packet = arp_request->packets.begin(); pending_packet != arp_request->packets.end(); pending_packet++) {
-            const ethernet_hdr* eth_hdr = (ethernet_hdr*) (pending_packet->packet.data());
+            ethernet_hdr* eth_hdr = (ethernet_hdr*) (pending_packet->packet.data());
 
             // Configure source and destination hosts (Ethernet addr)
             memcpy(eth_hdr->ether_shost, iface->addr.data(), ETHER_ADDR_LEN); 
@@ -195,7 +195,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     // // Find port #'s if TCP or UDP protocol
     // if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
     //   memcpy(src_port, ip_header + sizeof(ip_hdr), port_length);
-    //   memcpy(dst_port, ip_header + sizeof(ip_hdr) + sizeof(ip_hdr), port_length);
+    //   memcpy(dst_port, ip_header + sizeof(ip_hdr) + port_length, port_length);
     // } else {
     //   *src_port = 0;
     //   *dst_port = 0;
@@ -246,7 +246,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       if (arp_entry != nullptr) {
         std::cerr << "Forwarding IP packet!" << std::endl;
         // Modify Ethernet header to include new destination mac address
-        const ethernet_hdr* eth_hdr = (ethernet_hdr*) (packet.data());
+        ethernet_hdr* eth_hdr = (ethernet_hdr*) (packet.data());
 
         eth_hdr->ether_type = htons(ethertype_ip);
         

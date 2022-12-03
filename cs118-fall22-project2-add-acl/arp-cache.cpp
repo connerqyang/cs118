@@ -42,8 +42,8 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
         packet = (*req)->packets.erase(packet);
       }
 
-      // Remove pending request
-      m_arpRequests.erase(req);
+      // Remove pending request, move to next request
+      req = m_arpRequests.erase(req);
     } else {    // Send ARP request once per second until ARP reply is received or request has been sent out >=5 times
       // Find interface
       const Interface* iface = m_router.findIfaceByName((*req)->packets.front().iface);
@@ -53,10 +53,12 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       arp_hdr req_arp_hdr;
       Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
 
+      static const uint8_t broadcast[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};  // broadcast
+
       // Construct request ethernet header
       req_eth_hdr.ether_type = htons(ethertype_arp);
       memcpy(req_eth_hdr.ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
-      // memcpy(req_eth_hdr.ether_dhost, 0xFF, ETHER_ADDR_LEN);
+      memcpy(req_eth_hdr.ether_dhost, broadcast, ETHER_ADDR_LEN);
       
       // Construct request arp header
       req_arp_hdr.arp_hrd = htons(arp_hrd_ethernet);
@@ -69,7 +71,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       req_arp_hdr.arp_sip = iface->ip;
       req_arp_hdr.arp_tip = (*req)->ip;
       memcpy(req_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
-      // memcpy(req_arp_hdr.arp_tha, 0xFF, ETHER_ADDR_LEN);    // TODO
+      memcpy(req_arp_hdr.arp_tha, broadcast, ETHER_ADDR_LEN);    // TODO
       
       // Populate buffer with constructed headers
       memcpy(req_packet.data(), &req_eth_hdr, sizeof(ethernet_hdr));
@@ -83,9 +85,10 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       (*req)->nTimesSent++;
 
       // Cache response (done in simple-router.cpp)
+      req++;    // Move to next request
     }
 
-    req++;    // Move to next request
+    
   }
 
   // Else, ARP cache should eventually become empty
