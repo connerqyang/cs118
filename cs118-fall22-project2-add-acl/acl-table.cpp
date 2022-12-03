@@ -57,27 +57,27 @@ namespace simple_router {
 ACLTableEntry
 ACLTable::lookup(uint32_t srcIp, uint32_t dstIp, uint8_t protocol, uint16_t srcPort, uint16_t dstPort) const
 {
-  // // FILL THIS IN
-  // ACLTableEntry* return_rule = nullptr;
-  // int highest_priority = -1;
-  // // Loop through rules, apply them if needed
-  // for (std::list<ACLTableEntry>::const_iterator rule = m_entries.begin(); rule != m_entries.end(); rule++) {
-  //   // If fields do NOT match, then this rule does not apply so skip it
-  //   if (rule->src != srcIp || rule->dest != dstIp || rule->protocol != protocol || rule->srcPort != srcPort || rule->destPort != dstPort) {
-  //     continue;
-  //   }
+  // FILL THIS IN
+  ACLTableEntry* return_rule = nullptr;
+  int highest_priority = -1;
+  // Loop through rules, apply them if needed
+  for (std::list<ACLTableEntry>::const_iterator rule = m_entries.begin(); rule != m_entries.end(); rule++) {
+    // If fields do NOT match, then this rule does not apply so skip it
+    if (rule->src != srcIp || rule->dest != dstIp || rule->protocol != protocol || rule->srcPort != srcPort || rule->destPort != dstPort) {
+      continue;
+    }
 
-  //   // Otherwise, update highest priority
-  //   if (rule->priority > highest_priority) {
-  //     highest_priority = rule->priority;
-  //     return_rule = (ACLTableEntry*) &(*rule);
-  //   }
-  // }
-  // if (return_rule != nullptr) {
-  //   return *return_rule;
-  // } else {
-  //   return NULL;
-  // }
+    // Otherwise, update highest priority
+    if (rule->priority > highest_priority) {
+      highest_priority = rule->priority;
+      return_rule = (ACLTableEntry*) &(*rule);
+    }
+  }
+  if (return_rule != nullptr) {
+    return *return_rule;
+  } else {
+    throw std::runtime_error("ACL entry not found");
+  }
 }
 
 void
