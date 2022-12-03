@@ -184,30 +184,26 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     // Define TCP and UDP protocol #'s
     #define TCP_PROTOCOL 0x06
     #define UDP_PROTOCOL 0x11
-    static const int port_length = 16;
+    #define PORT_LEN 16
 
     // Prepare port # for ACL rule lookup. Default to 0 for ICMP
-    uint16_t src_port;
-    uint16_t dst_port;
-    Buffer src_port_buf(port_length);
-    Buffer dst_port_buf(port_length);
+    uint16_t src_port[PORT_LEN];
+    uint16_t dst_port[PORT_LEN];
 
     // Find port #'s if TCP or UDP protocol
     if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
-      memcpy(src_port_buf.data(), ip_header + sizeof(ip_hdr), port_length);
-      memcpy(dst_port_buf.data(), ip_header + sizeof(ip_hdr) + port_length, port_length);
-      src_port = (uint16_t) src_port_buf.data();
-      dst_port = (uint16_t) dst_port_buf.data();
+      memcpy(&src_port, ip_header + sizeof(ip_hdr), PORT_LEN);
+      memcpy(&dst_port, ip_header + sizeof(ip_hdr) + PORT_LEN, PORT_LEN);
     } else {
-      src_port = 0;
-      dst_port = 0;
+      memset(src_port, 0, PORT_LEN);
+      memset(dst_port, 0, PORT_LEN);
     }
 
     // Check ACL rules, take action accordingly
     bool acl_rule_found = true;
     ACLTableEntry rule;
     try {
-      rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
+      rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, src_port, dst_port);
     } catch (std::runtime_error& e) {
       std::cerr << "No matching ACL rule found, proceed with IP packet." << std::endl;
       acl_rule_found = false;
