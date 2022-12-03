@@ -208,7 +208,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
     if (acl_rule_found) {
       // Log rule
-      m_aclLogFile << rule << '\n';
+      m_aclLogFile << rule;
 
       // Follow it: Deny -> return here, Allow -> proceed below
       if (rule.action == "deny") {
