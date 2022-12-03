@@ -63,7 +63,7 @@ ACLTable::lookup(uint32_t srcIp, uint32_t dstIp, uint8_t protocol, uint16_t srcP
   // Loop through rules, apply them if needed
   for (std::list<ACLTableEntry>::const_iterator rule = m_entries.begin(); rule != m_entries.end(); rule++) {
     // If fields do NOT match, then this rule does not apply so skip it
-    if (rule->src != srcIp || rule->dest != dstIp || rule->protocol != protocol || rule->srcPort != srcPort || rule->destPort != dstPort) {
+    if ((rule->src & rule->srcMask) != srcIp || (rule->dest & rule->destMask) != dstIp || (rule->protocol * rule->protocolMask) != protocol || (rule->srcPort & rule->srcPortMask) != srcPort || (rule->destPort & rule->destPortMask) != dstPort) {
       continue;
     }
 
