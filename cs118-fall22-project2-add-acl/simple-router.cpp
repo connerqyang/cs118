@@ -184,19 +184,16 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     // Define TCP and UDP protocol #'s
     #define TCP_PROTOCOL 0x06
     #define UDP_PROTOCOL 0x11
-    #define PORT_LEN 16
+    #define PORT_LEN 2
 
     // Prepare port # for ACL rule lookup. Default to 0 for ICMP
-    uint16_t src_port[PORT_LEN];
-    uint16_t dst_port[PORT_LEN];
+    uint16_t src_port = 0;
+    uint16_t dst_port = 0;
 
     // Find port #'s if TCP or UDP protocol
     if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
       memcpy(&src_port, ip_header + sizeof(ip_hdr), PORT_LEN);
       memcpy(&dst_port, ip_header + sizeof(ip_hdr) + PORT_LEN, PORT_LEN);
-    } else {
-      memset(src_port, 0, PORT_LEN);
-      memset(dst_port, 0, PORT_LEN);
     }
 
     // Check ACL rules, take action accordingly
