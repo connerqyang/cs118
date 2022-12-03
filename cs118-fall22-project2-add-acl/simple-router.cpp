@@ -187,8 +187,8 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     static const int port_length = 16;
 
     // Prepare port # for ACL rule lookup. Default to 0 for ICMP
-    uint32_t* src_port;
-    uint32_t* dst_port;
+    uint16_t* src_port;
+    uint16_t* dst_port;
 
     // Find port #'s if TCP or UDP protocol
     if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
@@ -201,8 +201,9 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
     // Check ACL rules, take action accordingly
     bool acl_rule_found = true;
+    ACLTableEntry rule;
     try {
-      ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
+      rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
     } catch (std::runtime_error& e) {
       std::cerr << "No matching ACL rule found, proceed with IP packet." << std::endl;
       acl_rule_found = false;
