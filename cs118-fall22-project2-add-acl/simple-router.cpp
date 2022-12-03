@@ -182,8 +182,8 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     }
 
     // Define TCP and UDP protocol #'s
-    #define TCP_PROTOCOL = 0x06
-    #define UDP_PROTOCOL = 0x11
+    #define TCP_PROTOCOL 0x06
+    #define UDP_PROTOCOL 0x11
     static const int port_length = 16;
 
     // Prepare port # for ACL rule lookup. Default to 0 for ICMP
@@ -216,7 +216,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       ofs.close();
 
       // Follow it: Deny -> return here, Allow -> proceed below
-      if (rule.action == deny) {
+      if (rule.action == "deny") {
         std::cerr << "IP packet denied by ACL table, logged." << std::endl;
         return;
       }
