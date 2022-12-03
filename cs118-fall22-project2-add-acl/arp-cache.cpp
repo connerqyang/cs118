@@ -30,6 +30,7 @@ namespace simple_router {
 void
 ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
+  std::cerr << "Performing Periodic Check of ARP Requests + Cache Entries!" << std::endl;
   // FILL THIS IN
   // If there is an ongoing traffic
   std::list<std::shared_ptr<ArpRequest>>::iterator req = m_arpRequests.begin();
@@ -53,7 +54,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       arp_hdr req_arp_hdr;
       Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
 
-      static const uint8_t broadcast[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};  // broadcast
+      static const uint8_t broadcast[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};  // broadcast const
 
       // Construct request ethernet header
       req_eth_hdr.ether_type = htons(ethertype_arp);
@@ -71,7 +72,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       req_arp_hdr.arp_sip = iface->ip;
       req_arp_hdr.arp_tip = (*req)->ip;
       memcpy(req_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
-      memcpy(req_arp_hdr.arp_tha, broadcast, ETHER_ADDR_LEN);    // TODO
+      memcpy(req_arp_hdr.arp_tha, broadcast, ETHER_ADDR_LEN);
       
       // Populate buffer with constructed headers
       memcpy(req_packet.data(), &req_eth_hdr, sizeof(ethernet_hdr));
@@ -87,8 +88,6 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
       // Cache response (done in simple-router.cpp)
       req++;    // Move to next request
     }
-
-    
   }
 
   // Else, ARP cache should eventually become empty
@@ -98,7 +97,7 @@ ArpCache::periodicCheckArpRequestsAndCacheEntries()
     if ((*arp_cache_entry)->isValid) {
       arp_cache_entry++;    // Skip this one
     } else {
-      m_cacheEntries.erase(arp_cache_entry);  // Else, delete it.
+      arp_cache_entry = m_cacheEntries.erase(arp_cache_entry);  // Else, delete it.
     }
   }
   
