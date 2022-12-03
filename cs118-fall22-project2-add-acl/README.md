@@ -1,3 +1,9 @@
+Name: Conner Yang
+UID: 905417287
+No additional libraries used
+Extensive use of starter code, Piazza posts, and class announcements
+====================================
+
 UCLA CS118 2022 Fall Quarter Project 2 (Simple Router)
 ====================================
 
@@ -26,8 +32,7 @@ This is inherited from UCLA CS118 2017 Spring Quarter Project 3 (http://web.cs.u
 
 ## TODO
 
-    ###########################################################
-    ##                                                       ##
-    ## REPLACE CONTENT OF THIS FILE WITH YOUR PROJECT REPORT ##
-    ##                                                       ##
-    ###########################################################
+Name: Conner Yang
+UID: 905417287
+No additional libraries used
+Extensive use of starter code, Piazza posts, and class announcements

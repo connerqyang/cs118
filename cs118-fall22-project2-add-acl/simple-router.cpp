@@ -214,6 +214,8 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       if (rule.action == "deny") {
         std::cerr << "IP packet denied by ACL table, logged." << std::endl;
         return;
+      } else {
+        std::cerr << "IP packet allowed by ACL table, logged." << std::endl;
       }
     }
 
