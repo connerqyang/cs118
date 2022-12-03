@@ -31,7 +31,7 @@ void
 ArpCache::periodicCheckArpRequestsAndCacheEntries()
 {
   std::cerr << "Performing Periodic Check of ARP Requests + Cache Entries!" << std::endl;
-  std::cerr << "Current ARP Cache length: " << std::string(m_cacheEntries.size()) << std::endl;
+  std::cerr << "Current ARP Cache length: " << m_cacheEntries.size() << std::endl;
   // FILL THIS IN
   // If there is an ongoing traffic
   std::list<std::shared_ptr<ArpRequest>>::iterator req = m_arpRequests.begin();
