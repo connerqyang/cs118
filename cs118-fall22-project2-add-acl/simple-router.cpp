@@ -187,16 +187,20 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     static const int port_length = 16;
 
     // Prepare port # for ACL rule lookup. Default to 0 for ICMP
-    uint16_t* src_port;
-    uint16_t* dst_port;
+    uint16_t src_port;
+    uint16_t dst_port;
+    Buffer src_port_buf(port_length);
+    Buffer dst_port_buf(port_length);
 
     // Find port #'s if TCP or UDP protocol
     if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
-      memcpy(src_port, ip_header + sizeof(ip_hdr), port_length);
-      memcpy(dst_port, ip_header + sizeof(ip_hdr) + port_length, port_length);
+      memcpy(src_port_buf.data(), ip_header + sizeof(ip_hdr), port_length);
+      memcpy(dst_port_buf.data(), ip_header + sizeof(ip_hdr) + port_length, port_length);
+      src_port = (uint16_t) src_port_buf.data();
+      dst_port = (uint16_t) dst_port_buf.data();
     } else {
-      *src_port = 0;
-      *dst_port = 0;
+      src_port = 0;
+      dst_port = 0;
     }
 
     // Check ACL rules, take action accordingly
@@ -211,10 +215,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
     if (acl_rule_found) {
       // Log rule
-      std::string filePath = "router-acl.log";
-      std::ofstream ofs(filePath.c_str(), std::ios_base::out | std::ios_base::app );
-      ofs << rule << '\n';
-      ofs.close();
+      m_aclLogFile << rule << '\n';
 
       // Follow it: Deny -> return here, Allow -> proceed below
       if (rule.action == "deny") {
