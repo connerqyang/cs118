@@ -70,7 +70,7 @@ ACLTable::lookup(uint32_t srcIp, uint32_t dstIp, uint8_t protocol, uint16_t srcP
     // Otherwise, update highest priority
     if (rule->priority > highest_priority) {
       highest_priority = rule->priority;
-      return_rule = (ACLTableEntry*) &*rule;
+      return_rule = (ACLTableEntry*) &(*rule);
     }
   }
   if (return_rule != nullptr) {

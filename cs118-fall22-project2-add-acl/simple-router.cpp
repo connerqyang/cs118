@@ -97,7 +97,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
       // Construct response ethernet header
       memcpy(resp_eth_hdr.ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
-      memcpy(resp_eth_hdr.ether_dhost, &(arp_header->arp_sha), ETHER_ADDR_LEN);
+      memcpy(resp_eth_hdr.ether_dhost, arp_header->arp_sha, ETHER_ADDR_LEN);
       resp_eth_hdr.ether_type = htons(ethertype_arp);
 
       // Construct response arp header
@@ -107,11 +107,11 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       resp_arp_hdr.arp_pln = 4;
       resp_arp_hdr.arp_op = htons(arp_op_reply);
 
-      // Configure sources and targets
+      // Swap sources and targets
       resp_arp_hdr.arp_sip = iface->ip;
       resp_arp_hdr.arp_tip = arp_header->arp_sip;
       memcpy(resp_arp_hdr.arp_sha, iface->addr.data(), ETHER_ADDR_LEN);
-      memcpy(resp_arp_hdr.arp_tha, &(arp_header->arp_sha), ETHER_ADDR_LEN);
+      memcpy(resp_arp_hdr.arp_tha, arp_header->arp_sha, ETHER_ADDR_LEN);
       
       // Populate buffer with constructed headers
       memcpy(resp_packet.data(), &resp_eth_hdr, sizeof(ethernet_hdr));
@@ -129,22 +129,22 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
       // Record IP-MAC mapping in ARP cache (Source IP/Souce hardware address in ARP reply)
       if(m_arp.lookup(arp_header->arp_sip) == nullptr) {
-        std::shared_ptr<ArpRequest> arp_request = m_arp.insertArpEntry(addr_mapping, arp_header->arp_sip);
-        // Remove the pending request
-        m_arp.removeArpRequest(arp_request);
-        // Then, send out all corresponding enqueued packets
-        if (arp_request != NULL)
-        {
-          for (std::list<PendingPacket>::iterator iter = arp_request->packets.begin(); iter != arp_request->packets.end(); iter++)
-          {
-            ethernet_hdr* eth_hdr = (ethernet_hdr*) iter->packet.data();
+        std::shared_ptr<ArpRequest> arp_request = m_arp.insertArpEntry(addr_mapping, arp_header->arp_sip);    // Insert ARP entry
 
-            // TODO: is the dhost right?
-            memcpy(eth_hdr->ether_shost, iface->addr.data(), ETHER_ADDR_LEN);
+        // Then, send out all corresponding enqueued packets
+        if (arp_request != NULL) {
+          for (std::list<PendingPacket>::iterator pending_packet = arp_request->packets.begin(); pending_packet != arp_request->packets.end(); pending_packet++) {
+            ethernet_hdr* eth_hdr = reinterpret_cast<ethernet_hdr*> (pending_packet->packet.data());
+
+            // Configure source and destination hosts (Ethernet addr)
+            memcpy(eth_hdr->ether_shost, iface->addr.data(), ETHER_ADDR_LEN); 
             memcpy(eth_hdr->ether_dhost, arp_header->arp_sha, ETHER_ADDR_LEN);
 
-            sendPacket(iter->packet, iter->iface);
+            sendPacket(pending_packet->packet, pending_packet->iface);
           }
+
+          // Remove the pending request
+          m_arp.removeArpRequest(arp_request);
         }
       } else {
         std::cerr << "ARP reply/response received is invalid, ignoring" << std::endl;
@@ -181,23 +181,25 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
       return;
     }
 
-    // Define TCP and UDP protocol #'s
-    #define TCP_PROTOCOL = 0x06
-    #define UDP_PROTOCOL = 0x11
-    static const int port_length = 16;
+    // // Define TCP and UDP protocol #'s
+    // #define TCP_PROTOCOL = 0x06
+    // #define UDP_PROTOCOL = 0x11
+    // static const int port_length = 16;
 
-    // Prepare port # for ACL rule lookup. Default to 0 for ICMP
-    uint32_t* src_port;
-    uint32_t* dst_port;
+    // // Prepare port # for ACL rule lookup. Default to 0 for ICMP
+    // uint32_t* src_port;
+    // uint32_t* dst_port;
 
-    // Find port #'s if TCP or UDP protocol
-    if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
-      memcpy(src_port, ip_header + sizeof(ip_hdr), port_length);
-      memcpy(dst_port, ip_header + sizeof(ip_hdr) + sizeof(ip_hdr), port_length);
-    } else {
-      *src_port = 0;
-      *dst_port = 0;
-    }
+    // TODO: discard packet if it's not TCP, UDP, or ICMP
+
+    // // Find port #'s if TCP or UDP protocol
+    // if (ip_header->ip_p == TCP_PROTOCOL || ip_header->ip_p == UDP_PROTOCOL) {
+    //   memcpy(src_port, ip_header + sizeof(ip_hdr), port_length);
+    //   memcpy(dst_port, ip_header + sizeof(ip_hdr) + sizeof(ip_hdr), port_length);
+    // } else {
+    //   *src_port = 0;
+    //   *dst_port = 0;
+    // }
 
     // Check ACL rules, take action accordingly
     // ACLTableEntry rule = m_aclTable.lookup(ip_header->ip_src, ip_header->ip_dst, ip_header->ip_p, *src_port, *dst_port);
@@ -216,17 +218,17 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
     // }
 
     // Classify datagrams into (1) destined to the router or (2) datagrams to be forwarded
-    const Interface* iface = findIfaceByIp(ip_header->ip_dst);
-    if (iface != nullptr) {
+    const Interface* dst_iface = findIfaceByIp(ip_header->ip_dst);
+    if (dst_iface != nullptr) {
       // (1) discard packets
-      std::cerr << "Packet discarded, since incoming IP packet's destination is the router" << std::endl;
+      std::cerr << "Packet discarded since incoming IP packet's destination is the router" << std::endl;
       return;
     } else {
       // (2) Use longest prefix match alg. to find next-hop IP addr in routing table and attempt to forward it there
       //      For each forwarded packet:
       //          decrement TTL and recompute checksum
       std::cerr << "Routing packets" << std::endl;
-      if (ip_header->ip_ttl == 0) {
+      if (ip_header->ip_ttl <= 0) {
         std::cerr << "The TTL is 0, dropping this packet" << std::endl;
         return;
       }
@@ -235,28 +237,29 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
 
       // Check routing table for longest prefix match with dest. IP address
       RoutingTableEntry next_hop = m_routingTable.lookup(ip_header->ip_dst);
-      const Interface* ip_iface = findIfaceByName(next_hop.ifName);
+      const Interface* next_hop_iface = findIfaceByName(next_hop.ifName);
 
       // Check ARP cache for next-hop MAC address corresponding to next-hop IP
-      auto arp = m_arp.lookup(next_hop.gw);
+      std::shared_ptr<ArpEntry> arp_entry = m_arp.lookup(next_hop.gw);
 
       // If it's there, send it.
-      if (arp != nullptr) {
+      if (arp_entry != nullptr) {
         std::cerr << "Forwarding IP packet!" << std::endl;
-        // Construct Ethernet header
-        ethernet_hdr* eth_hdr = (ethernet_hdr*) packet.data();
+        // Modify Ethernet header to include new destination mac address
+        ethernet_hdr* eth_hdr = reinterpret_cast<ethernet_hdr*> (packet.data());
 
         eth_hdr->ether_type = htons(ethertype_ip);
-        memcpy(eth_hdr->ether_shost, eth_hdr->ether_dhost, ETHER_ADDR_LEN);   // Old destination is new source
-        memcpy(eth_hdr->ether_dhost, arp->mac.data(), ETHER_ADDR_LEN);
+        
+        memcpy(eth_hdr->ether_shost, next_hop_iface->addr.data(), ETHER_ADDR_LEN);   // new source is router
+        memcpy(eth_hdr->ether_dhost, arp_entry->mac.data(), ETHER_ADDR_LEN);  // new destination is MAC of next hop
 
         // Send it!
-        sendPacket(packet, ip_iface->name);
+        sendPacket(packet, next_hop_iface->name);
         std::cerr << "Forwarded!!!" << std::endl;
       } else {
         std::cerr << "Queuing ARP request!" << std::endl;
         // Add the packet to the queue of packets waiting on this ARP request
-        m_arp.queueArpRequest(next_hop.gw, packet, ip_iface->name);
+        m_arp.queueArpRequest(next_hop.gw, packet, next_hop_iface->name);
         std::cerr << "ARP Request queued!" << std::endl;
 
         // Otherwise:
@@ -267,10 +270,10 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         arp_hdr req_arp_hdr;
         Buffer req_packet(sizeof(ethernet_hdr) + sizeof(arp_hdr));
 
-        // Construct request ethernet header
+        // Construct request ethernet header, specify src/dst
         std::cerr << "Creating ETH header!" << std::endl;
         req_eth_hdr.ether_type = htons(ethertype_arp);
-        memcpy(req_eth_hdr.ether_shost, ip_iface->addr.data(), ETHER_ADDR_LEN);
+        memcpy(req_eth_hdr.ether_shost, next_hop_iface->addr.data(), ETHER_ADDR_LEN);
         memcpy(req_eth_hdr.ether_dhost, broadcast, ETHER_ADDR_LEN);
 
         // Construct request arp header
@@ -282,10 +285,9 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         req_arp_hdr.arp_op = htons(arp_op_request);
 
         // Configure sources and targets
-        req_arp_hdr.arp_sip = ip_iface->ip;
-        // req_arp_hdr.arp_tip = arp_header->arp_sip;
+        req_arp_hdr.arp_sip = next_hop_iface->ip;
         req_arp_hdr.arp_tip = next_hop.gw;
-        memcpy(req_arp_hdr.arp_sha, ip_iface->addr.data(), ETHER_ADDR_LEN);
+        memcpy(req_arp_hdr.arp_sha, next_hop_iface->addr.data(), ETHER_ADDR_LEN);
         memcpy(req_arp_hdr.arp_tha, broadcast, ETHER_ADDR_LEN);
         
         // Populate buffer with constructed headers
@@ -293,7 +295,7 @@ SimpleRouter::processPacket(const Buffer& packet, const std::string& inIface)
         memcpy(req_packet.data() + sizeof(ethernet_hdr), &req_arp_hdr, sizeof(arp_hdr));
 
         // Send back the response/reply
-        sendPacket(req_packet, ip_iface->name);
+        sendPacket(req_packet, next_hop_iface->name);
         std::cerr << "Sent ARP request packet!" << std::endl;
       }
     }
